@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: api-person-aggregator
+  webflux:
+    base-path: /api/v1
+  data:
+    redis:
+      host: localhost
+      port: 6379
+server:
+  port: 8090
