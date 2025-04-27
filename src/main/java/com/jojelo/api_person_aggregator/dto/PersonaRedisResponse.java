@@ -19,4 +19,5 @@ public class PersonaRedisResponse implements Serializable {
     private static final long serialVersionUID = 6150397933943980231L;
 
     private Integer id;
+    private Integer age;
 }

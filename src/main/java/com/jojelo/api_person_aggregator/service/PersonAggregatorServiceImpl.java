@@ -1,6 +1,5 @@
 package com.jojelo.api_person_aggregator.service;
 
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jojelo.api_person_aggregator.dto.PersonAggregatorRequest;
@@ -17,10 +16,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.io.IOException;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -38,22 +34,12 @@ public class PersonAggregatorServiceImpl implements PersonAggregatorService {
     public Mono<Integer> getAllPerson(List<String> uuids) {
         return Flux.fromIterable(uuids)
                 .flatMap(this::getPersonFromRedis)
+                .filter(redisAgeResponse -> redisAgeResponse.getAge() > 18)
                 .flatMap(personFromRedis -> {
                     Integer id = personFromRedis.getId();
 
-                    Mono<PersonDocumentResponse> personDocumentMono = apiDataCaller.getPersonDocumentById(id)
-                            .onErrorResume(e -> {
-                                log.error("Error al obtener el documento de la persona con ID {}: {}", id, e.getMessage());
-                                return Mono.just(PersonDocumentResponse.builder()
-                                        .id(id.longValue())
-                                        .document(11111111)
-                                        .build());
-                            });
-                    Mono<PersonEmailResponse> personEmailMono = apiDataCaller.getPersonEmailById(id)
-                            .onErrorResume(e -> {
-                                log.error("Error crítico al obtener el email de la persona con ID {}: {}", id, e.getMessage());
-                                return Mono.error(new RuntimeException("Error obteniendo email para ID " + id, e));
-                            });
+                    Mono<PersonDocumentResponse> personDocumentMono = apiDataCaller.getPersonDocumentById(id);
+                    Mono<PersonEmailResponse> personEmailMono = apiDataCaller.getPersonEmailById(id);
 
                     return Mono.zip(personDocumentMono, personEmailMono)
                             .map(tuple -> {
@@ -80,13 +66,9 @@ public class PersonAggregatorServiceImpl implements PersonAggregatorService {
                 .map(savedEntities -> {
                             log.info("Se guardaron {} entidades en la base de datos", savedEntities.size());
                             return savedEntities.size();
-                        }));
+                        })
+                );
 
-//        return Flux.fromIterable(uuids)
-//                .flatMap(this::getPersonFromRedis)
-//                .map(PersonaRedisResponse::getId)
-//                .collectList()
-//                .flux();
     }
 
     private Mono<PersonaRedisResponse> getPersonFromRedis(String uuid) {
@@ -99,6 +81,6 @@ public class PersonAggregatorServiceImpl implements PersonAggregatorService {
                         return Mono.error(new RuntimeException("Error al deserializar JSON", e));
                     }
                 })
-                .switchIfEmpty(Mono.empty());
+                .switchIfEmpty(Mono.error(new RuntimeException("Persona no encontrada en Redis con UUID: " + uuid)));
     }
 }
